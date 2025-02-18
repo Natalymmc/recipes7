@@ -4,7 +4,6 @@ import com.example.recipes.model.Recipe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,6 +33,6 @@ public class RecipeService {
     public List<Recipe> getRecipesByTitle(String title) {
         return recipes.stream()
                 .filter(recipe -> recipe.getTitle().toLowerCase().contains(title.toLowerCase()))
-                .collect(Collectors.toList());
+                .toList();
     }
 }
