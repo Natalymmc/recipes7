@@ -8,7 +8,7 @@ class RecipesApplicationTests {
 
     @Test
     void contextLoads() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        throw new UnsupportedOperationException("Not supported yet)).");
     }
 
 }
