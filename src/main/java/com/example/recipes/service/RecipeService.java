@@ -12,7 +12,6 @@ public class RecipeService {
     private final List<Recipe> recipes = new ArrayList<>();
 
 
-    // @PostConstruct
     public RecipeService() {
         recipes.add(new Recipe(1L, "Борщ", "Традиционный украинский суп",
                 Arrays.asList("Свекла", "Капуста", "Мясо"),
@@ -35,3 +34,4 @@ public class RecipeService {
                 .toList();
     }
 }
+

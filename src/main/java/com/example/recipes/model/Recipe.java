@@ -10,8 +10,8 @@ public class Recipe {
     private List<String> ingredients;
     private String instructions;
 
-    public Recipe(Long id, String title, String description, List<String> ingredients,
-                  String instructions) {
+    public Recipe(Long id, String title, String description,
+                  List<String> ingredients, String instructions) {
         this.id = id;
         this.title = title;
         this.description = description;
