@@ -1,5 +1,5 @@
 
-![image](https://github.com/user-attachments/assets/df73c576-f64e-4458-9a73-94017f932c98)
+![image](https://github.com/user-attachments/assets/1e98e0bf-caef-4d4d-8596-874aab600b67)
 
 # Recipe Manager API
 
