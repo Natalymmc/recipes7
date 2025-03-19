@@ -30,7 +30,7 @@ public class ReviewController {
         return reviewService.createReview(recipeId, review);
     }
 
-    // возможно поменять пар-ры и сооотв и ф-цию
+    // возможно поменять пар-ры и соотв и ф-цию
     @PutMapping("/{reviewId}")
     public Review updateReview(@PathVariable Integer reviewId, @RequestBody Review review) {
         return reviewService.updateReview(reviewId, review);
