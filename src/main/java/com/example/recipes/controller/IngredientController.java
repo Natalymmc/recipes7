@@ -39,7 +39,7 @@ public class IngredientController {
         ingredientService.delete(ingredientId, recipeId);
     }
 
-
+    //поменять путь, чтобы было без рецепта
     @GetMapping("/recipes/{recipeId}/ingredients/{ingredientId}")
     public Ingredient findByRecipeId(@PathVariable Long ingredientId,
                                                      @PathVariable Long recipeId) {
@@ -50,6 +50,7 @@ public class IngredientController {
     public List<Ingredient> findAllIngredients() {
         return ingredientService.findAllIngredients();
     }
+
 
 }
 

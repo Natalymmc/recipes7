@@ -30,6 +30,7 @@ public class Recipe {
     private List<Ingredient> ingredients;
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    
     private List<Review> reviews;
 
     public List<Ingredient> getIngredients() {

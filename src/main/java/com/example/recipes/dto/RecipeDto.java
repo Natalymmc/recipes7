@@ -4,6 +4,7 @@ import java.util.List;
 
 public class RecipeDto {
     private String title;
+
     private List<IngredientDto> ingredients;
     private List<ReviewDto> reviews;
 

@@ -7,7 +7,6 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
-
 @Service
 public class ReviewService {
 
@@ -40,7 +39,11 @@ public class ReviewService {
     }
 
     public void deleteReview(Integer reviewId) {
+        if (!reviewRepository.existsById(reviewId)) {
+            throw new EntityNotFoundException("Review not found");
+        }
         reviewRepository.deleteById(reviewId);
+
     }
 
     public List<Review> getReviewsByRecipeId(Long recipeId) {
