@@ -1,37 +1,82 @@
 package com.example.recipes.service;
 
-import com.example.recipes.model.Recipe;
+import com.example.recipes.entity.Ingredient;
+import com.example.recipes.entity.Recipe;
+import com.example.recipes.entity.Review;
+import com.example.recipes.repository.IngredientRepository;
+import com.example.recipes.repository.RecipeRepository;
+import jakarta.persistence.EntityNotFoundException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RecipeService {
 
-    private final List<Recipe> recipes = new ArrayList<>();
+    private final RecipeRepository recipeRepository;
+    private final IngredientRepository ingredientRepository;
 
-
-    public RecipeService() {
-        recipes.add(new Recipe(1L, "Борщ", "Традиционный украинский суп",
-                Arrays.asList("Свекла", "Капуста", "Мясо"),
-                "1. Нарежьте свеклу и капусту. 2. Сварите мясо. 3. Добавьте овощи в бульон."));
-        recipes.add(new Recipe(2L, "Паста Карбонара", "Итальянское блюдо с беконом и сыром",
-                Arrays.asList("Паста", "Бекон", "Яйца", "Сыр Пармезан"),
-                "1. Отварите пасту. 2. Обжарьте бекон. 3. Смешайте яйца и сыр, добавьте в пасту."));
+    public RecipeService(RecipeRepository recipeRepository,
+                         IngredientRepository ingredientRepository) {
+        this.recipeRepository = recipeRepository;
+        this.ingredientRepository = ingredientRepository;
     }
 
-    public Recipe getRecipeById(Long id) {
-        return recipes.stream()
-                .filter(recipe -> recipe.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+    public List<Recipe> findByTitle(String title) {
+        List<Recipe> recipes = recipeRepository.findByTitle(title);
+        if (recipes.isEmpty()) {
+            throw new EntityNotFoundException("No recipes found with title: " + title);
+        }
+        return recipes;
     }
 
-    public List<Recipe> getRecipesByTitle(String title) {
-        return recipes.stream()
-                .filter(recipe -> recipe.getTitle().toLowerCase().contains(title.toLowerCase()))
-                .toList();
+    public List<Recipe> findAllRecipes() {
+        return recipeRepository.findAll();
+    }
+
+    public Recipe findById(Long id) {
+        return recipeRepository.findById(id).orElseThrow(() ->
+                new EntityNotFoundException("Recipe not found"));
+    }
+
+    public Recipe save(Recipe recipe) {
+
+        if (recipe.getIngredients() != null) {
+            List<Ingredient> saveIngredients = new ArrayList<>();
+
+            for (Ingredient ingredient : recipe.getIngredients()) {
+
+                if (ingredientRepository.existsByName(ingredient.getName())) {
+                    Ingredient existingIngredient =
+                            ingredientRepository.findByName(ingredient.getName());
+                    saveIngredients.add(existingIngredient);
+                } else {
+                    saveIngredients.add(ingredientRepository.save(ingredient));
+                }
+            }
+
+            recipe.setIngredients(saveIngredients);
+        }
+
+        for (Review review : recipe.getReviews()) {
+            review.setRecipe(recipe);
+        }
+
+        return recipeRepository.save(recipe);
+    }
+
+    public Recipe update(Long id, Recipe recipe) {
+        if (!recipeRepository.existsById(id)) {
+            throw new EntityNotFoundException("Recipe not found");
+        }
+        recipe.setId(id);
+        return recipeRepository.save(recipe);
+    }
+
+    public void delete(Long id) {
+        if (!recipeRepository.existsById(id)) {
+            throw new EntityNotFoundException("Recipe not found with ID: " + id);
+        }
+        recipeRepository.deleteById(id);
     }
 }
-
