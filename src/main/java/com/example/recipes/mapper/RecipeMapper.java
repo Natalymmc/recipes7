@@ -41,23 +41,23 @@ public class RecipeMapper {
     }
 
     public Recipe toEntity(RecipeDto recipeDto) {
-        Recipe book = new Recipe();
-        book.setTitle(recipeDto.getTitle());
+        Recipe recipe = new Recipe();
+        recipe.setTitle(recipeDto.getTitle());
 
         if (recipeDto.getIngredients() != null) {
             List<Ingredient> ingredients = recipeDto.getIngredients().stream()
                     .map(ingredientMapper::toEntity)
                     .toList();
-            book.setIngredients(ingredients);
+            recipe.setIngredients(ingredients);
         }
 
         if (recipeDto.getReviews() != null) {
             List<Review> reviews = recipeDto.getReviews().stream()
                     .map(reviewMapper::toEntity)
                     .toList();
-            book.setReviews(reviews);
+            recipe.setReviews(reviews);
         }
 
-        return book;
+        return recipe;
     }
 }
