@@ -19,9 +19,11 @@ public class Recipe {
     private Long id;
 
     private String title;
+    private String description;
+    private String instruction;
 
-    @ManyToMany(cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH},
-            fetch = FetchType.LAZY)
+    @ManyToMany(cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST,
+                           CascadeType.REFRESH}, fetch = FetchType.LAZY)
     @JoinTable(
             name = "recipe_ingredient",
             joinColumns = @JoinColumn(name = "recipe_id"),
@@ -63,5 +65,21 @@ public class Recipe {
 
     public void setReviews(List<Review> reviews) {
         this.reviews = reviews;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getInstruction() {
+        return instruction;
+    }
+
+    public void setInstruction(String instruction) {
+        this.instruction = instruction;
     }
 }

@@ -22,6 +22,8 @@ public class RecipeMapper {
     public RecipeDto toDto(Recipe recipe) {
         RecipeDto recipeDto = new RecipeDto();
         recipeDto.setTitle(recipe.getTitle());
+        recipeDto.setDescription(recipe.getDescription());
+        recipeDto.setInstruction(recipe.getInstruction());
 
         if (recipe.getIngredients() != null) {
             List<IngredientDto> ingredientsDto = recipe.getIngredients().stream()

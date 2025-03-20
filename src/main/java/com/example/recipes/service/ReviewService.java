@@ -13,9 +13,9 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final RecipeService recipeService;
 
-    public ReviewService(ReviewRepository reviewRepository, RecipeService bookService) {
+    public ReviewService(ReviewRepository reviewRepository, RecipeService recipeService) {
         this.reviewRepository = reviewRepository;
-        this.recipeService = bookService;
+        this.recipeService = recipeService;
     }
 
     public Review createReview(Long recipeId, Review review) {
@@ -35,6 +35,11 @@ public class ReviewService {
         Review initialReview = reviewRepository.findById(id).orElseThrow(() ->
                 new EntityNotFoundException("Review not found"));
         initialReview.setMessage(review.getMessage());
+
+        if (review.getRating() < 1 || review.getRating() > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
+        initialReview.setRating(review.getRating());
         return reviewRepository.save(initialReview);
     }
 

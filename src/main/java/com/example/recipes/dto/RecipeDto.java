@@ -4,6 +4,8 @@ import java.util.List;
 
 public class RecipeDto {
     private String title;
+    private String description;
+    private String instruction;
 
     private List<IngredientDto> ingredients;
     private List<ReviewDto> reviews;
@@ -30,5 +32,21 @@ public class RecipeDto {
 
     public void setReviews(List<ReviewDto> reviews) {
         this.reviews = reviews;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setInstruction(String instruction) {
+        this.instruction = instruction;
+    }
+
+    public String getInstruction() {
+        return instruction;
     }
 }

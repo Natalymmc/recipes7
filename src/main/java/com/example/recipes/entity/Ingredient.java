@@ -15,7 +15,7 @@ public class Ingredient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToMany(mappedBy = "ingredients", fetch = FetchType.EAGER)
+    @ManyToMany(mappedBy = "ingredients", fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"ingredients", "reviews"})
     private List<Recipe> recipes;
 

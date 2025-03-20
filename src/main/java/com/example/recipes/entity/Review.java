@@ -17,6 +17,7 @@ public class Review {
     private Long id;
 
     private String message;
+    private Integer rating;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recipe_id")
@@ -45,5 +46,13 @@ public class Review {
 
     public void setRecipe(Recipe recipe) {
         this.recipe = recipe;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
     }
 }
