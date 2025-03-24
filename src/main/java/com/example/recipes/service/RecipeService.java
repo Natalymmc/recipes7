@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RecipeService {
 
+    private static final String RECIPE_NOT_FOUND = "Recipe not found";
+
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
     private final RecipeMapper recipeMapper;
@@ -39,7 +41,7 @@ public class RecipeService {
     @Transactional
     public RecipeDto getRecipeById(Long id) {
         Recipe recipe = recipeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
         return recipeMapper.convertToDto(recipe);
     }
 
@@ -76,7 +78,7 @@ public class RecipeService {
 
     public RecipeFullDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
         Recipe recipe = recipeRepository.findById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
         recipe.setTitle(recipeDto.getTitle());
         recipe.setDescription(recipeDto.getDescription());
         recipe.setInstruction(recipeDto.getInstruction());
@@ -87,7 +89,7 @@ public class RecipeService {
     @Transactional
     public void deleteRecipeById(Long id) {
         Recipe recipe = recipeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
 
         recipe.getIngredients().clear();
         recipeRepository.save(recipe);
