@@ -36,7 +36,7 @@ public class RecipeService {
         List<Recipe> recipes = recipeRepository.findAll();
         return recipes.stream()
                 .map(recipeMapper::convertToFullDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -50,7 +50,7 @@ public class RecipeService {
         return recipeRepository.findByTitleContainingIgnoreCase(title)
                 .stream()
                 .map(recipeMapper::convertToDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
