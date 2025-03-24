@@ -1,6 +1,7 @@
 package com.example.recipes.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -10,38 +11,45 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
-import java.util.List;
+import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
+@Table(name = "recipes")
 public class Recipe {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String title;
+
+    @Column(length = 2000)
     private String description;
+
+    @Column(length = 5000, nullable = false)
     private String instruction;
 
-    @ManyToMany(cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST,
-                           CascadeType.REFRESH}, fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "recipe_ingredient",
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    @JoinTable(name = "recipe_ingredient",
             joinColumns = @JoinColumn(name = "recipe_id"),
-            inverseJoinColumns = @JoinColumn(name = "ingredient_id")
-    )
-    private List<Ingredient> ingredients;
+            inverseJoinColumns = @JoinColumn(name = "ingredient_id"))
+    private Set<Ingredient> ingredients = new HashSet<>();
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    
-    private List<Review> reviews;
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL,
+            orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<Review> reviews = new HashSet<>();
 
-    public List<Ingredient> getIngredients() {
-        return ingredients;
+    public Recipe() {}
+
+    public Recipe(String title, String description, String instruction) {
+        this.title = title;
+        this.description = description;
+        this.instruction = instruction;
     }
 
-    public void setIngredients(List<Ingredient> ingredients) {
-        this.ingredients = ingredients;
-    }
 
     public Long getId() {
         return id;
@@ -59,14 +67,6 @@ public class Recipe {
         this.title = title;
     }
 
-    public List<Review> getReviews() {
-        return reviews;
-    }
-
-    public void setReviews(List<Review> reviews) {
-        this.reviews = reviews;
-    }
-
     public String getDescription() {
         return description;
     }
@@ -81,5 +81,21 @@ public class Recipe {
 
     public void setInstruction(String instruction) {
         this.instruction = instruction;
+    }
+
+    public Set<Ingredient> getIngredients() {
+        return ingredients;
+    }
+
+    public void setIngredients(Set<Ingredient> ingredients) {
+        this.ingredients = ingredients;
+    }
+
+    public Set<Review> getReviews() {
+        return reviews;
+    }
+
+    public void setReviews(Set<Review> reviews) {
+        this.reviews = reviews;
     }
 }

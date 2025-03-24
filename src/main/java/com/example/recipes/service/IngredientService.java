@@ -1,103 +1,60 @@
 package com.example.recipes.service;
 
+import com.example.recipes.dto.IngredientDto;
 import com.example.recipes.entity.Ingredient;
 import com.example.recipes.entity.Recipe;
+import com.example.recipes.mapper.IngredientMapper;
 import com.example.recipes.repository.IngredientRepository;
-import com.example.recipes.repository.RecipeRepository;
 import jakarta.persistence.EntityNotFoundException;
-import java.util.ArrayList;
-import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class IngredientService {
 
-    private static final String ERROR_MESSAGE = "Ingredient not found";
-
     private final IngredientRepository ingredientRepository;
-    private final RecipeService recipeService;
-    private final RecipeRepository recipeRepository;
+    private final IngredientMapper ingredientMapper;
 
-    public IngredientService(IngredientRepository ingredientRepository,
-                             RecipeService recipeService, RecipeRepository recipeRepository) {
+
+    public IngredientService(IngredientRepository ingredientRepository) {
         this.ingredientRepository = ingredientRepository;
-        this.recipeService = recipeService;
-        this.recipeRepository = recipeRepository;
+        this.ingredientMapper = new IngredientMapper();
     }
 
-    public Ingredient findById(Long id, Long recipeId) {
-        if (!recipeRepository.existsById(recipeId)) {
-            throw new EntityNotFoundException("Recipe not found");
-
+    @Transactional
+    public void deleteIngredient(Long ingredientId) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new EntityNotFoundException("Ingredient not found"));
+        for (Recipe recipe : ingredient.getRecipes()) {
+            recipe.getIngredients().remove(ingredient);
         }
-
-        Recipe recipe = recipeService.findById(recipeId);
-        List<Ingredient> ingredients = recipe.getIngredients();
-        Ingredient ingredient = ingredientRepository.findById(id).orElseThrow(() ->
-                new EntityNotFoundException(ERROR_MESSAGE));
-        if (ingredients.contains(ingredient)) {
-            return ingredient;
-        } else {
-            throw new EntityNotFoundException(ERROR_MESSAGE);
-        }
+        ingredientRepository.delete(ingredient);
     }
 
-    public List<Ingredient> findAllIngredients() {
-        return ingredientRepository.findAll();
+    @Transactional
+    public IngredientDto createIngredient(IngredientDto ingredientDto) {
+        if (ingredientRepository
+                .findByName(ingredientDto.getName()).isPresent()) {
+            throw new IllegalArgumentException("Ingredient with name '"
+                    + ingredientDto.getName() + "' already exists");
+        }
+        Ingredient ingredient = new Ingredient();
+        ingredient.setName(ingredientDto.getName());
+        ingredient = ingredientRepository.save(ingredient);
+        ingredientDto.setId(ingredient.getId());
+        return ingredientDto;
     }
 
-    public Ingredient save(Ingredient ingredient, Long recipeId) {
+    @Transactional
+    public IngredientDto updateIngredient(Long id, IngredientDto ingredientDto) {
+        Ingredient ingredient = ingredientRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Ingredient not found"));
 
-        Recipe recipe = recipeService.findById(recipeId);
+        ingredient.setName(ingredientDto.getName());
+        ingredientRepository.save(ingredient);
 
-        if (recipe == null) {
-            throw new EntityNotFoundException("Recipe not found");
-        }
-
-        List<Recipe> newRecipes = new ArrayList<>();
-
-        if (ingredientRepository.existsByName(ingredient.getName())) {
-            ingredient = ingredientRepository.findByName(ingredient.getName());
-            newRecipes = ingredient.getRecipes();
-        }
-
-        List<Ingredient> ingredients = recipe.getIngredients();
-        if (!ingredients.contains(ingredient)) {
-            ingredients.add(ingredient);
-            recipe.setIngredients(ingredients);
-            newRecipes.add(recipe);
-            ingredient.setRecipes(newRecipes);
-        }
-
-        return ingredientRepository.save(ingredient);
+        return ingredientMapper.convertToDto(ingredient);
     }
 
-    public Ingredient update(Long id, Ingredient ingredient) {
-        if (!ingredientRepository.existsById(id)) {
-            throw new EntityNotFoundException(ERROR_MESSAGE);
-        }
-        ingredient.setId(id);
-        return ingredientRepository.save(ingredient);
-    }
 
-    public void delete(Long id, Long recipeId) {
-
-        Recipe recipe = recipeService.findById(recipeId);
-        List<Ingredient> ingredients = recipe.getIngredients();
-        Ingredient ingredient = findById(id, recipeId);
-
-        ingredients.remove(ingredient);
-
-        recipe.setIngredients(ingredients);
-        recipeService.update(recipeId, recipe);
-
-        List<Recipe> recipes = ingredient.getRecipes();
-        recipes.remove(recipe);
-        if (recipes.isEmpty()) {
-            ingredientRepository.delete(ingredient);
-        } else {
-            ingredient.setRecipes(recipes);
-            update(id, ingredient);
-        }
-    }
 }

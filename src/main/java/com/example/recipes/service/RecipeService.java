@@ -1,83 +1,97 @@
 package com.example.recipes.service;
 
+import com.example.recipes.dto.RecipeDto;
+import com.example.recipes.dto.RecipeFullDto;
 import com.example.recipes.entity.Ingredient;
 import com.example.recipes.entity.Recipe;
-import com.example.recipes.entity.Review;
+import com.example.recipes.mapper.RecipeMapper;
 import com.example.recipes.repository.IngredientRepository;
 import com.example.recipes.repository.RecipeRepository;
 import jakarta.persistence.EntityNotFoundException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecipeService {
 
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
+    private final RecipeMapper recipeMapper;
 
     public RecipeService(RecipeRepository recipeRepository,
-                         IngredientRepository ingredientRepository) {
+                         IngredientRepository ingredientRepository, RecipeMapper recipeMapper) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
+        this.recipeMapper = recipeMapper;
+
     }
 
-    public List<Recipe> findByTitle(String title) {
-        List<Recipe> recipes = recipeRepository.findByTitle(title);
-        if (recipes.isEmpty()) {
-            throw new EntityNotFoundException("No recipes found with title: " + title);
-        }
-        return recipes;
+    public List<RecipeFullDto> getAllRecipes() {
+        List<Recipe> recipes = recipeRepository.findAll();
+        return recipes.stream()
+                .map(recipeMapper::convertToFullDto)
+                .collect(Collectors.toList());
     }
 
-    public List<Recipe> findAllRecipes() {
-        return recipeRepository.findAll();
+    @Transactional
+    public RecipeDto getRecipeById(Long id) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+        return recipeMapper.convertToDto(recipe);
     }
 
-    public Recipe findById(Long id) {
-        return recipeRepository.findById(id).orElseThrow(() ->
-                new EntityNotFoundException("Recipe not found"));
+    public List<RecipeDto> findRecipesByTitle(String title) {
+        return recipeRepository.findByTitleContainingIgnoreCase(title)
+                .stream()
+                .map(recipeMapper::convertToDto)
+                .collect(Collectors.toList());
     }
 
-    public Recipe save(Recipe recipe) {
+    @Transactional
+    public RecipeFullDto createRecipe(RecipeDto recipeDto) {
 
-        if (recipe.getIngredients() != null) {
-            List<Ingredient> saveIngredients = new ArrayList<>();
+        Recipe recipe = new Recipe(recipeDto.getTitle(),
+                recipeDto.getDescription(), recipeDto.getInstruction());
 
-            for (Ingredient ingredient : recipe.getIngredients()) {
+        Set<Ingredient> ingredients = recipeDto.getIngredients().stream().map(ingredientDto -> {
 
-                if (ingredientRepository.existsByName(ingredient.getName())) {
-                    Ingredient existingIngredient =
-                            ingredientRepository.findByName(ingredient.getName());
-                    saveIngredients.add(existingIngredient);
-                } else {
-                    saveIngredients.add(ingredientRepository.save(ingredient));
-                }
-            }
+            return ingredientRepository.findByName(ingredientDto.getName())
+                    .orElseGet(() -> {
 
-            recipe.setIngredients(saveIngredients);
-        }
+                        Ingredient ingredient = new Ingredient();
+                        ingredient.setName(ingredientDto.getName());
+                        return ingredientRepository.save(ingredient);
+                    });
+        }).collect(Collectors.toSet());
 
-        for (Review review : recipe.getReviews()) {
-            review.setRecipe(recipe);
-        }
+        recipe.setIngredients(ingredients);
 
-        return recipeRepository.save(recipe);
+        recipeRepository.save(recipe);
+
+        return recipeMapper.convertToFullDto(recipe);
     }
 
-    public Recipe update(Long id, Recipe recipe) {
-        if (!recipeRepository.existsById(id)) {
-            throw new EntityNotFoundException("Recipe not found");
-        }
-        recipe.setId(id);
-        return recipeRepository.save(recipe);
+    public RecipeFullDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+        recipe.setTitle(recipeDto.getTitle());
+        recipe.setDescription(recipeDto.getDescription());
+        recipe.setInstruction(recipeDto.getInstruction());
+        recipeRepository.save(recipe);
+        return recipeMapper.convertToFullDto(recipe);
     }
 
-    public void delete(Long id) {
-        if (!recipeRepository.existsById(id)) {
-            throw new EntityNotFoundException("Recipe not found with ID: " + id);
-        }
-        recipeRepository.deleteById(id);
-    }
+    @Transactional
+    public void deleteRecipeById(Long id) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
 
+        recipe.getIngredients().clear();
+        recipeRepository.save(recipe);
+
+        recipeRepository.delete(recipe);
+    }
 }

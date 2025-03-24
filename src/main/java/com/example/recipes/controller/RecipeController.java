@@ -1,10 +1,10 @@
 package com.example.recipes.controller;
 
 import com.example.recipes.dto.RecipeDto;
-import com.example.recipes.entity.Recipe;
-import com.example.recipes.mapper.RecipeMapper;
+import com.example.recipes.dto.RecipeFullDto;
 import com.example.recipes.service.RecipeService;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,48 +20,42 @@ import org.springframework.web.bind.annotation.RestController;
 public class RecipeController {
 
     private final RecipeService recipeService;
-    private final RecipeMapper recipeMapper;
 
-    public RecipeController(RecipeService recipeService, RecipeMapper recipeMapper) {
+    public RecipeController(RecipeService recipeService) {
         this.recipeService = recipeService;
-        this.recipeMapper = recipeMapper;
-    }
-
-    //возможно поменять
-    @GetMapping
-    public List<RecipeDto> getRecipes(@RequestParam(required = false) String title) {
-        List<Recipe> recipes = recipeService.findByTitle(title);
-        return recipes.stream()
-                .map(recipeMapper::toDto)
-                .toList();
     }
 
     @GetMapping("/all")
-    public List<RecipeDto> getAllRecipes() {
-        List<Recipe> recipes = recipeService.findAllRecipes();
-        return recipes.stream()
-                .map(recipeMapper::toDto)
-                .toList();
+    public ResponseEntity<List<RecipeFullDto>> getAllRecipes() {
+        List<RecipeFullDto> recipes = recipeService.getAllRecipes();
+        return ResponseEntity.ok(recipes);
     }
 
     @GetMapping("/{id}")
-    public RecipeDto getRecipeById(@PathVariable Long id) {
-        Recipe recipe = recipeService.findById(id);
-        return recipeMapper.toDto(recipe);
+    public ResponseEntity<RecipeDto> getRecipeById(@PathVariable Long id) {
+        return ResponseEntity.ok(recipeService.getRecipeById(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<RecipeDto>> getRecipesByTitle(@RequestParam String title) {
+        return ResponseEntity.ok(recipeService.findRecipesByTitle(title));
     }
 
     @PostMapping
-    public Recipe createRecipe(@RequestBody Recipe recipe) {
-        return recipeService.save(recipe);
+    public ResponseEntity<RecipeFullDto> createRecipe(@RequestBody RecipeDto recipeDto) {
+        return ResponseEntity.ok(recipeService.createRecipe(recipeDto));
     }
 
-    @PutMapping("/{id}")
-    public Recipe updateRecipe(@PathVariable Long id, @RequestBody Recipe recipe) {
-        return recipeService.update(id, recipe);
+    @PutMapping("/{recipeId}")
+    public ResponseEntity<RecipeFullDto> updateRecipe(@PathVariable Long recipeId,
+                                                      @RequestBody RecipeDto recipeDto) {
+        return ResponseEntity.ok(recipeService.updateRecipe(recipeId, recipeDto));
     }
 
     @DeleteMapping("/{id}")
-    public void deleteRecipe(@PathVariable Long id) {
-        recipeService.delete(id);
+    public ResponseEntity<Void> deleteRecipe(@PathVariable Long id) {
+        recipeService.deleteRecipeById(id);
+        return ResponseEntity.noContent().build();
     }
+
 }
