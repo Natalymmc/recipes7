@@ -8,6 +8,7 @@ import com.example.recipes.mapper.RecipeMapper;
 import com.example.recipes.repository.IngredientRepository;
 import com.example.recipes.repository.RecipeRepository;
 import jakarta.persistence.EntityNotFoundException;
+
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
