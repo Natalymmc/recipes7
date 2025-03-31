@@ -58,4 +58,17 @@ public class RecipeController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/search/multiple-ingredients")
+    public ResponseEntity<List<RecipeDto>> findRecipesByIngredientNames(
+            @RequestParam List<String> ingredientNames) {
+        List<RecipeDto> recipes = recipeService.findRecipesByIngredientNames(ingredientNames);
+        return ResponseEntity.ok(recipes);
+    }
+
+    @GetMapping("/search/average-rating")
+    public ResponseEntity<List<RecipeDto>> findRecipesByAverageRating(@RequestParam String rating) {
+        List<RecipeDto> recipes = recipeService.findRecipesByAverageRating(rating);
+        return ResponseEntity.ok(recipes);
+    }
+
 }
