@@ -31,14 +31,17 @@ public class RecipeDto {
     }
 
     public void setDescription(String description) {
+
         this.description = description;
     }
 
     public Set<IngredientDto> getIngredients() {
+
         return ingredients;
     }
 
     public void setIngredients(Set<IngredientDto> ingredients) {
+
         this.ingredients = ingredients;
     }
 }
