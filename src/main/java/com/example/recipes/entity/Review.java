@@ -28,6 +28,16 @@ public class Review {
     @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 
+    public Review(Long id, String message, Integer rating, Recipe recipe) {
+        this.id = id;
+        this.message = message;
+        this.rating = rating;
+        this.recipe = recipe;
+    }
+
+    public Review() {
+    }
+
     public Long getId() {
         return id;
     }

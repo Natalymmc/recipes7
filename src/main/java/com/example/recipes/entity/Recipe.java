@@ -44,6 +44,14 @@ public class Recipe {
 
     public Recipe() {}
 
+    //для теста
+    public Recipe(Long id, String title, String description, String instruction) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.instruction = instruction;
+    }
+
     public Recipe(String title, String description, String instruction) {
         this.title = title;
         this.description = description;

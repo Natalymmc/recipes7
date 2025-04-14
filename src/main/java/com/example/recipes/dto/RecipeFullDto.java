@@ -61,6 +61,5 @@ public class RecipeFullDto {
     public Set<ReviewDto> getReviews() {
         return reviews;
     }
-
 }
 
