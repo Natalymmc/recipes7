@@ -24,5 +24,5 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
             + "GROUP BY r.id "
             + "HAVING AVG(rev.rating) >= :rating",
         nativeQuery = true)
-    List<Recipe> findRecipesByAverageRating(@Param("rating") Double rating);
+List<Recipe> findRecipesByAverageRating(@Param("rating") Double rating);
 }
