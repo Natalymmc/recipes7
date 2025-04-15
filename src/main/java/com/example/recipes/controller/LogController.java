@@ -38,16 +38,16 @@ public class LogController {
             summary = "Получить лог-файл за указанную дату",
             description = " Лог-файл формируется из общего файла с фильтрацией по указанной дате.",
             responses = {
-                @ApiResponse(
+                    @ApiResponse(
                             responseCode = "200",
                             description = "Лог-файл успешно сформирован и возвращён.",
                             content = @Content(mediaType = "text/plain")
                     ),
-                @ApiResponse(
+                    @ApiResponse(
                             responseCode = "400",
                             description = "Некорректный формат даты."
                     ),
-                @ApiResponse(
+                    @ApiResponse(
                             responseCode = "500",
                             description = "Ошибка сервера при обработке файла."
                     )

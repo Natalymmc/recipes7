@@ -19,7 +19,7 @@ public class LogService {
     private final String logDirectory;
     private final String commonLogFileName;
 
-    public LogService(@Value("${log.directory}")String logDirectory) {
+    public LogService(@Value("${log.directory:/logs/}")String logDirectory) {
         this.logDirectory = logDirectory;
         this.commonLogFileName = "application.log";
     }

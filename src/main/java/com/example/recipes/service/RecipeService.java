@@ -1,14 +1,17 @@
 package com.example.recipes.service;
 
 import com.example.recipes.config.CacheConfig;
+import com.example.recipes.dto.IngredientDto;
 import com.example.recipes.dto.RecipeDto;
 import com.example.recipes.dto.RecipeFullDto;
 import com.example.recipes.entity.Ingredient;
 import com.example.recipes.entity.Recipe;
+import com.example.recipes.exceptions.NotFoundException;
+import com.example.recipes.exceptions.ValidationException;
 import com.example.recipes.mapper.RecipeMapper;
 import com.example.recipes.repository.IngredientRepository;
 import com.example.recipes.repository.RecipeRepository;
-import jakarta.persistence.EntityNotFoundException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -19,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecipeService {
-
-    private static final String RECIPE_NOT_FOUND = "Recipe not found";
 
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
@@ -39,32 +40,25 @@ public class RecipeService {
     }
 
     public List<RecipeFullDto> getAllRecipes() {
-        String cacheKey = "all_recipes";
-
-        if (cacheService.containsKey(cacheKey)) {
-            logger.info("Cache hit for key: {}", cacheKey);
-            return (List<RecipeFullDto>) cacheService.get(cacheKey);
-        }
-        logger.info("Cache miss for key: {}", cacheKey);
         List<Recipe> recipes = recipeRepository.findAll();
-        List<RecipeFullDto> recipeDtos = recipes.stream()
+        return recipes.stream()
                 .map(recipeMapper::convertToFullDto)
                 .toList();
-
-        cacheService.put(cacheKey, recipeDtos);
-        // logger.info("Data cached for key: {}", cacheKey);
-        return recipeDtos;
     }
 
     @Transactional
     public RecipeDto getRecipeById(Long id) {
+        if (id <= 0) {
+            throw new ValidationException("Recipe ID must be greater than 0.");
+        }
+
         String cacheKey = "recipe_" + id;
         if (cacheService.containsKey(cacheKey)) {
             return (RecipeDto) cacheService.get(cacheKey);
         }
 
         Recipe recipe = recipeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException("Recipe not found with ID " + id));
 
         RecipeDto recipeDto = recipeMapper.convertToDto(recipe);
         cacheService.put(cacheKey, recipeDto);
@@ -72,6 +66,9 @@ public class RecipeService {
     }
 
     public List<RecipeDto> findRecipesByTitle(String title) {
+        if (title == null || title.trim().isEmpty()) {
+            throw new ValidationException("Recipe title cannot be null or empty.");
+        }
         String cacheKey = "recipes_by_title_" + title.toLowerCase();
         if (cacheService.containsKey(cacheKey)) {
             return (List<RecipeDto>) cacheService.get(cacheKey);
@@ -82,12 +79,31 @@ public class RecipeService {
                 .map(recipeMapper::convertToDto)
                 .toList();
 
+        if (recipeDtos.isEmpty()) {
+            throw new NotFoundException("No recipes found with title containing: " + title);
+        }
+
         cacheService.put(cacheKey, recipeDtos);
         return recipeDtos;
     }
-
+    //убрать фул
+    /*
     @Transactional
-    public RecipeFullDto createRecipe(RecipeDto recipeDto) {
+    public RecipeDto createRecipe(RecipeDto recipeDto) {
+        if (recipeDto.getTitle() == null || recipeDto.getTitle().isEmpty()) {
+            throw new ValidationException("Recipe title cannot be null or empty.");
+        }
+
+        if (recipeDto.getIngredients() == null || recipeDto.getIngredients().isEmpty()) {
+            throw new ValidationException("Recipe must have at least one ingredient.");
+        }
+
+        recipeDto.getIngredients().forEach(ingredientDto -> {
+            if (ingredientDto.getName() == null || ingredientDto.getName().trim().isEmpty()) {
+                throw new ValidationException("Ingredient name cannot be null or empty.");
+            }
+        });
+
         Recipe recipe = new Recipe(
                 recipeDto.getTitle(),
                 recipeDto.getDescription(),
@@ -101,18 +117,63 @@ public class RecipeService {
                 .collect(Collectors.toSet());
 
         recipe.setIngredients(ingredients);
-
-        // Recipe savedRecipe = recipeRepository.save(recipe);
-        recipeRepository.save(recipe); //замена предыдущей строки
+        recipeRepository.save(recipe);
 
         clearRecipeCache();
-        //return recipeMapper.convertToFullDto(savedRecipe);
-        return recipeMapper.convertToFullDto(recipe);
+        return recipeMapper.convertToDto(recipe);
+    }
+*/
+
+    @Transactional
+    public RecipeDto createRecipe(RecipeDto recipeDto) {
+        if (recipeDto.getTitle() == null || recipeDto.getTitle().isEmpty()) {
+            throw new ValidationException("Recipe title cannot be null or empty.");
+        }
+
+        if (recipeDto.getIngredients() == null || recipeDto.getIngredients().isEmpty()) {
+            throw new ValidationException("Recipe must have at least one ingredient.");
+        }
+
+        recipeDto.getIngredients().forEach(ingredientDto -> {
+            if (ingredientDto.getName() == null || ingredientDto.getName().trim().isEmpty()) {
+                throw new ValidationException("Ingredient name cannot be null or empty.");
+            }
+        });
+
+        Recipe recipe = new Recipe(
+                recipeDto.getTitle(),
+                recipeDto.getDescription(),
+                recipeDto.getInstruction()
+        );
+
+        // Убираем дублирующиеся ингредиенты по имени
+        Set<String> uniqueNames = new HashSet<>();
+        Set<Ingredient> ingredients = recipeDto.getIngredients().stream()
+                .filter(ingredientDto -> uniqueNames.add(ingredientDto.getName()))
+                .map(ingredientDto -> ingredientRepository.findByName(ingredientDto.getName())
+                        .orElseGet(() -> ingredientRepository
+                                .save(new Ingredient(ingredientDto.getName()))))
+                .collect(Collectors.toSet());
+
+        recipe.setIngredients(ingredients);
+        recipeRepository.save(recipe);
+
+        clearRecipeCache();
+        return recipeMapper.convertToDto(recipe);
     }
 
-    public RecipeFullDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
+
+    public RecipeDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
+        if (recipeId == null || recipeId <= 0) {
+            throw new ValidationException("Recipe ID must be greater than 0.");
+        }
+
+        // Проверка на пустое название рецепта
+        if (recipeDto.getTitle() == null || recipeDto.getTitle().trim().isEmpty()) {
+            throw new ValidationException("Recipe title cannot be null or empty.");
+        }
         Recipe recipe = recipeRepository.findById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException("Recipe not found with ID " + recipeId));
         recipe.setTitle(recipeDto.getTitle());
         recipe.setDescription(recipeDto.getDescription());
         recipe.setInstruction(recipeDto.getInstruction());
@@ -121,13 +182,16 @@ public class RecipeService {
 
         cacheService.evict("recipe_" + recipeId);
         clearRecipeCache();
-        return recipeMapper.convertToFullDto(updatedRecipe);
+        return recipeMapper.convertToDto(updatedRecipe);
     }
 
     @Transactional
     public void deleteRecipeById(Long id) {
+        if (id <= 0) {
+            throw new ValidationException("Recipe ID must be greater than 0.");
+        }
         Recipe recipe = recipeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(RECIPE_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException("Recipe not found with ID " + id));
 
         recipe.getIngredients().clear();
         recipeRepository.save(recipe);
@@ -139,6 +203,10 @@ public class RecipeService {
     }
 
     public List<RecipeDto> findRecipesByIngredientNames(List<String> ingredientNames) {
+        if (ingredientNames == null || ingredientNames.isEmpty()) {
+            throw new ValidationException("Ingredient list cannot be null or empty.");
+        }
+
         String cacheKey = "recipes_by_ingredients_" + ingredientNames.toString();
         if (cacheService.containsKey(cacheKey)) {
             return (List<RecipeDto>) cacheService.get(cacheKey);
@@ -156,18 +224,42 @@ public class RecipeService {
                 .map(recipeMapper::convertToDto)
                 .toList();
 
+        if (recipeDtos.isEmpty()) {
+            throw new NotFoundException("No recipes found "
+                    + "with ingredients: " + ingredientNames);
+        }
+
         cacheService.put(cacheKey, recipeDtos);
         return recipeDtos;
     }
 
     public List<RecipeDto> findRecipesByAverageRating(String rating) {
-        String cacheKey = "recipes_by_rating_" + rating;
+        if (rating == null || rating.trim().isEmpty()) {
+            throw new ValidationException("Rating cannot be null or empty.");
+        }
+
+        double normalizedRating;
+        try {
+            normalizedRating = Double.parseDouble(rating.replace(",", "."));
+        } catch (NumberFormatException e) {
+            throw new ValidationException("Rating must be a valid numeric value.");
+        }
+
+        if (normalizedRating < 0 || normalizedRating > 10) {
+            throw new ValidationException("Rating must be between 0 and 10.");
+        }
+
+        String cacheKey = "recipes_by_rating_" + normalizedRating;
         if (cacheService.containsKey(cacheKey)) {
             return (List<RecipeDto>) cacheService.get(cacheKey);
         }
 
-        Double normalizedRating = Double.parseDouble(rating.replace(",", "."));
         List<Recipe> recipes = recipeRepository.findRecipesByAverageRating(normalizedRating);
+
+        if (recipes.isEmpty()) {
+            throw new NotFoundException("No recipes found with "
+                    + "average rating: " + normalizedRating);
+        }
 
         List<RecipeDto> recipeDtos = recipes.stream()
                 .map(recipeMapper::convertToDto)
