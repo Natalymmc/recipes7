@@ -10,6 +10,10 @@ import com.example.recipes.repository.IngredientRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class IngredientService {
 
@@ -21,7 +25,13 @@ public class IngredientService {
         this.ingredientMapper = new IngredientMapper();
     }
 
-    //было tr
+    public List<IngredientDto> getAllIngredients() {
+        return ingredientRepository.findAll().stream()
+                .map(ingredientMapper::convertToDto)
+                .collect(Collectors.toList());
+
+    }
+        //было tr
     public void deleteIngredient(Long ingredientId) {
         if (ingredientId == null || ingredientId <= 0) {
             throw new ValidationException("Ingredient ID must be greater than 0.");

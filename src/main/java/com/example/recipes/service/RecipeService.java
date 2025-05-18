@@ -39,10 +39,10 @@ public class RecipeService {
         this.cacheService = cacheService;
     }
 
-    public List<RecipeFullDto> getAllRecipes() {
+    public List<RecipeDto> getAllRecipes() {
         List<Recipe> recipes = recipeRepository.findAll();
         return recipes.stream()
-                .map(recipeMapper::convertToFullDto)
+                .map(recipeMapper::convertToDto)
                 .toList();
     }
 
@@ -130,8 +130,21 @@ public class RecipeService {
             throw new ValidationException("Recipe title cannot be null or empty.");
         }
 
+        // Check the length of the recipe title
+        if (recipeDto.getTitle().length() > 36) { // Set your desired max length
+            throw new ValidationException("Recipe title cannot exceed 36 characters.");
+        }
+
         if (recipeDto.getIngredients() == null || recipeDto.getIngredients().isEmpty()) {
             throw new ValidationException("Recipe must have at least one ingredient.");
+        }
+
+        if (recipeDto.getDescription() == null || recipeDto.getDescription().isEmpty()) {
+            throw new ValidationException("Recipe description cannot be null or empty.");
+        }
+
+        if (recipeDto.getInstruction() == null || recipeDto.getInstruction().isEmpty()) {
+            throw new ValidationException("Recipe instruction cannot be null or empty.");
         }
 
         recipeDto.getIngredients().forEach(ingredientDto -> {
@@ -161,8 +174,7 @@ public class RecipeService {
         clearRecipeCache();
         return recipeMapper.convertToDto(recipe);
     }
-
-
+    /*
     public RecipeDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
         if (recipeId == null || recipeId <= 0) {
             throw new ValidationException("Recipe ID must be greater than 0.");
@@ -182,6 +194,83 @@ public class RecipeService {
 
         cacheService.evict("recipe_" + recipeId);
         clearRecipeCache();
+        return recipeMapper.convertToDto(updatedRecipe);
+    }
+*/
+
+    public RecipeDto updateRecipe(Long recipeId, RecipeDto recipeDto) {
+        // Валидация входных данных
+        if (recipeId == null || recipeId <= 0) {
+            throw new ValidationException("Recipe ID must be greater than 0.");
+        }
+        if (recipeDto.getTitle() == null || recipeDto.getTitle().trim().isEmpty()) {
+            throw new ValidationException("Recipe title cannot be null or empty.");
+        }
+
+        // Check the length of the recipe title
+        if (recipeDto.getTitle().length() > 36) { // Set your desired max length
+            throw new ValidationException("Recipe title cannot exceed 36 characters.");
+        }
+
+        if (recipeDto.getIngredients() == null || recipeDto.getIngredients().isEmpty()) {
+            throw new ValidationException("Recipe must have at least one ingredient.");
+        }
+
+        if (recipeDto.getDescription() == null || recipeDto.getDescription().isEmpty()) {
+            throw new ValidationException("Recipe description cannot be null or empty.");
+        }
+
+        if (recipeDto.getInstruction() == null || recipeDto.getInstruction().isEmpty()) {
+            throw new ValidationException("Recipe instruction cannot be null or empty.");
+        }
+
+        recipeDto.getIngredients().forEach(ingredientDto -> {
+            if (ingredientDto.getName() == null || ingredientDto.getName().trim().isEmpty()) {
+                throw new ValidationException("Ingredient name cannot be null or empty.");
+            }
+        });
+
+        // Получаем рецепт из базы данных
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new NotFoundException("Recipe not found with ID " + recipeId));
+
+        // Обновляем основные поля
+        recipe.setTitle(recipeDto.getTitle());
+        recipe.setDescription(recipeDto.getDescription());
+        recipe.setInstruction(recipeDto.getInstruction());
+
+        // Обрабатываем ингредиенты
+        if (recipeDto.getIngredients() != null) {
+            // Получаем текущие ингредиенты рецепта
+            Set<Ingredient> currentIngredients = recipe.getIngredients();
+            if (currentIngredients == null) {
+                currentIngredients = new HashSet<>();
+            }
+
+            // Создаем новый набор ингредиентов
+            Set<Ingredient> updatedIngredients = new HashSet<>();
+
+            // Для каждого ингредиента из DTO
+            for (IngredientDto ingredientDto : recipeDto.getIngredients()) {
+                // Находим ингредиент в базе
+                Ingredient ingredient = ingredientRepository.findById(ingredientDto.getId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "Ingredient not found with ID " + ingredientDto.getId()));
+
+                updatedIngredients.add(ingredient);
+            }
+
+            // Устанавливаем обновленный набор ингредиентов
+            recipe.setIngredients(updatedIngredients);
+        }
+
+        // Сохраняем изменения
+        Recipe updatedRecipe = recipeRepository.save(recipe);
+
+        // Очищаем кэш
+        cacheService.evict("recipe_" + recipeId);
+        clearRecipeCache();
+
         return recipeMapper.convertToDto(updatedRecipe);
     }
 

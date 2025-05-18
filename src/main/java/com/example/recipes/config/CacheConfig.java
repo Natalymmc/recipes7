@@ -53,7 +53,7 @@ public class CacheConfig {
     }
 
     public void evictByPattern(String pattern) {
-        // String normalizedPattern = pattern.replace("*", "");
+         //String normalizedPattern = pattern.replace("*", "");
         Set<String> keysToRemove = cache.keySet().stream()
                 .filter(key -> key.startsWith(pattern.replace("*", "")))
                 .collect(Collectors.toSet());

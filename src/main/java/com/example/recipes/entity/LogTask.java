@@ -4,7 +4,7 @@ public class LogTask {
 
     private Long id;
     private String date;
-    private String status; // IN_PROGRESS, COMPLETED, FAILED
+    private String status;
     private String filePath;
     private String errorMessage;
 

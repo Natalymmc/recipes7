@@ -5,19 +5,15 @@ import com.example.recipes.service.IngredientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-
-
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Set;
 
 @Tag(name = "Запросы ингредментов", description = "CRUD operations for ingredients")
+@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/ingredients")
 public class IngredientController {
@@ -26,6 +22,11 @@ public class IngredientController {
 
     public IngredientController(IngredientService ingredientService) {
         this.ingredientService = ingredientService;
+    }
+
+    @GetMapping("/all")
+    public List<IngredientDto> getAllIngredients() {
+        return ingredientService.getAllIngredients();
     }
 
     @Operation(

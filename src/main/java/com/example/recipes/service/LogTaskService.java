@@ -1,8 +1,8 @@
 package com.example.recipes.service;
 
 import com.example.recipes.entity.LogTask;
-import com.example.recipes.exceptions.NotFoundException;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,7 @@ public class LogTaskService {
         // Асинхронное выполнение задачи
         CompletableFuture.runAsync(() -> {
             try {
-                Thread.sleep(7000);
+                  Thread.sleep(6000);
 
                 File logFile = logService.createLogFileForDate(date);
                 task.setStatus("COMPLETED");
@@ -74,8 +74,6 @@ public class LogTaskService {
             return ResponseEntity.ok(resource);
         } catch (IOException e) {
             throw new RuntimeException("Error fetching file: " + e.getMessage());
-        } catch (IllegalStateException e) {
-            throw new NotFoundException("Log file is empty");
         }
     }
 }

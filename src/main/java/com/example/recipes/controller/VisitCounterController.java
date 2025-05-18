@@ -40,3 +40,4 @@ public class VisitCounterController {
         return ResponseEntity.ok(allCounts);
     }
 }
+

@@ -1,4 +1,3 @@
-
 package com.example.recipes.service;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,3 +25,4 @@ public class VisitCounterInterceptor implements HandlerInterceptor {
         return true;
     }
 }
+

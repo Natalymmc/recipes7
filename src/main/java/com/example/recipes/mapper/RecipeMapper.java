@@ -29,6 +29,7 @@ public class RecipeMapper {
 
     public RecipeDto convertToDto(Recipe recipe) {
         RecipeDto dto = new RecipeDto();
+        dto.setId(recipe.getId());
         dto.setTitle(recipe.getTitle());
         dto.setDescription(recipe.getDescription());
         dto.setInstruction(recipe.getInstruction());

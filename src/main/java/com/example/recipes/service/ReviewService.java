@@ -91,7 +91,6 @@ public class ReviewService {
                 updatedReview.getMessage(), updatedReview.getRating());
     }
 
-    //@Transactional(readOnly = true)
     public Set<ReviewDto> getAllReviewsForRecipe(Long recipeId) {
         if (recipeId == null || recipeId <= 0) {
             throw new ValidationException("Recipe ID must be greater than 0.");
@@ -102,7 +101,7 @@ public class ReviewService {
 
         // Проверяем, есть ли отзывы
         if (recipe.getReviews().isEmpty()) {
-            throw new ValidationException("No reviews found for recipe ID " + recipeId);
+            throw new NotFoundException("No reviews found for recipe ID " + recipeId);
         }
 
         return recipe.getReviews().stream().map(review ->

@@ -5,10 +5,19 @@ import java.util.Set;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RecipeDto {
+    private Long id;
     private String title;
     private String description;
     private String instruction;
     private Set<IngredientDto> ingredients;
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getId() {
+        return id;
+    }
 
     public String getTitle() {
         return title;
@@ -44,4 +53,5 @@ public class RecipeDto {
 
         this.ingredients = ingredients;
     }
+
 }
