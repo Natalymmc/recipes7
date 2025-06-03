@@ -1,0 +1,462 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <thread>
+#include <mutex>
+#include <cstring>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cctype>
+#include <libgen.h>
+
+using namespace std;
+
+// Конфигурация сервера
+const int PORT = 8080;
+const int MAX_CONNECTIONS = 10;
+const int BUFFER_SIZE = 4096;
+const string BASE_DIR = "./files/";
+const string TEMP_DIR = "./temp/";
+mutex log_mutex;
+
+// Утилиты для работы со строками
+string to_lower(const string& str) {
+    string result = str;
+    for (char& c : result) c = tolower(c);
+    return result;
+}
+
+string url_decode(const string& str) {
+    string result;
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '%' && i + 2 < str.size()) {
+            int value;
+            istringstream iss(str.substr(i + 1, 2));
+            if (iss >> hex >> value) {
+                result += static_cast<char>(value);
+                i += 2;
+            } else {
+                result += str[i];
+            }
+        } else if (str[i] == '+') {
+            result += ' ';
+        } else {
+            result += str[i];
+        }
+    }
+    return result;
+}
+
+// Управление файловой системой
+bool create_directory(const string& path) {
+    if (mkdir(path.c_str(), 0777) == -1) {
+        if (errno != EEXIST) {
+            cerr << "Error creating directory: " << path << " - " << strerror(errno) << endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool file_exists(const string& path) {
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+bool is_safe_path(const string& base, const string& path) {
+    // Нормализуем базовый путь (добавляем ./ если нужно)
+    string normalized_base = base;
+    if (normalized_base.find("./") != 0) {
+        normalized_base = "./" + normalized_base;
+    }
+
+    // Получаем абсолютные пути для сравнения
+    char abs_base[PATH_MAX];
+    char abs_path[PATH_MAX];
+    
+    realpath(normalized_base.c_str(), abs_base);
+    realpath((normalized_base + path).c_str(), abs_path);
+    
+    string abs_base_str(abs_base);
+    string abs_path_str(abs_path);
+    
+    // Добавляем / в конец базового пути
+    if (abs_base_str.back() != '/') {
+        abs_base_str += '/';
+    }
+    
+    // Проверяем, что путь находится внутри базовой директории
+    bool is_safe = (abs_path_str.find(abs_base_str) == 0);
+    
+    if (!is_safe) {
+        cerr << "Path safety check failed:\n"
+             << "Base: " << abs_base_str << "\n"
+             << "Path: " << abs_path_str << endl;
+    }
+    
+    return is_safe;
+}
+
+// Обработка HTTP
+void send_response(int client_sock, int status, const string& message, const string& content = "", const string& content_type = "text/plain") {
+    ostringstream oss;
+    oss << "HTTP/1.1 " << status << " " << message << "\r\n"
+        << "Content-Type: " << content_type << "\r\n"
+        << "Content-Length: " << content.size() << "\r\n"
+        << "Connection: close\r\n\r\n"
+        << content;
+    
+    string response = oss.str();
+    send(client_sock, response.c_str(), response.size(), 0);
+}
+
+void send_file(int client_sock, const string& file_path) {
+    int fd = open(file_path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        send_response(client_sock, 404, "Not Found", "File not found");
+        return;
+    }
+
+    struct stat file_stat;
+    fstat(fd, &file_stat);
+
+    ostringstream oss;
+    oss << "HTTP/1.1 200 OK\r\n"
+        << "Content-Type: application/octet-stream\r\n"
+        << "Content-Length: " << file_stat.st_size << "\r\n"
+        << "Connection: close\r\n\r\n";
+    
+    string headers = oss.str();
+    send(client_sock, headers.c_str(), headers.size(), 0);
+    sendfile(client_sock, fd, nullptr, file_stat.st_size);
+    close(fd);
+}
+
+map<string, string> parse_headers(const vector<string>& lines) {
+    map<string, string> headers;
+    for (size_t i = 1; i < lines.size(); ++i) {
+        size_t pos = lines[i].find(':');
+        if (pos != string::npos) {
+            string key = to_lower(lines[i].substr(0, pos));
+            string value = lines[i].substr(pos + 1);
+            while (!value.empty() && value[0] == ' ') value.erase(0, 1);
+            headers[key] = value;
+        }
+    }
+    return headers;
+}
+
+// Работа с архивами
+bool create_tar_archive(const string& input_path, const string& output_path) {
+    cerr << "Creating archive: " << output_path << " from " << input_path << endl;
+    pid_t pid = fork();
+    if (pid == -1) {
+        cerr << "fork failed: " << strerror(errno) << endl;
+        return false;
+    }
+
+    if (pid == 0) {
+        // Извлекаем имя файла из input_path
+        string filename = input_path.substr(input_path.find_last_of('/') + 1);
+        // Переходим в BASE_DIR для создания архива без вложенной структуры
+        if (chdir(BASE_DIR.c_str()) == -1) {
+            cerr << "chdir to " << BASE_DIR << " failed: " << strerror(errno) << endl;
+            exit(EXIT_FAILURE);
+        }
+        execlp("tar", "tar", "-cf", output_path.c_str(), filename.c_str(), nullptr);
+        cerr << "execlp failed: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            cerr << "Archive creation failed for " << input_path << " with status: " << WEXITSTATUS(status) << endl;
+        }
+        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+}
+
+bool extract_archive(const string& archive_path, const string& output_dir) {
+    string ext = archive_path.substr(archive_path.find_last_of('.') + 1);
+    cerr << "Extracting " << archive_path << " to " << output_dir << endl;
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        cerr << "fork failed: " << strerror(errno) << endl;
+        return false;
+    }
+
+    if (pid == 0) {
+        if (ext == "tar") {
+            cerr << "Executing: tar -xf " << archive_path << " -C " << output_dir << endl;
+            execlp("tar", "tar", "-xf", archive_path.c_str(), "-C", output_dir.c_str(), nullptr);
+        } else if (ext == "gz") {
+            string output_path = output_dir + "/" + archive_path.substr(archive_path.find_last_of('/')+1);
+            output_path = output_path.substr(0, output_path.size()-3);
+            cerr << "Executing: gzip -d -c " << archive_path << " > " << output_path << endl;
+            execlp("sh", "sh", "-c", ("gzip -d -c " + archive_path + " > " + output_path).c_str(), nullptr);
+        } else {
+            cerr << "Unsupported archive format: " << ext << endl;
+            exit(EXIT_FAILURE);
+        }
+        cerr << "execlp failed: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            cerr << "Extraction failed for " << archive_path << " with status: " << WEXITSTATUS(status) << endl;
+        }
+        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+}
+
+// Обработчики запросов
+void handle_get_file(int client_sock, const string& filename) {
+    string file_path = BASE_DIR + filename;
+    
+    if (!is_safe_path(BASE_DIR, filename) || !file_exists(file_path)) {
+        send_response(client_sock, 404, "Not Found", "File not found");
+        return;
+    }
+    
+    send_file(client_sock, file_path);
+}
+
+void handle_post_upload(int client_sock, const map<string, string>& headers, const string& body) {
+    auto it = headers.find("x-filename");
+    if (it == headers.end()) {
+        send_response(client_sock, 400, "Bad Request", "Missing X-Filename header");
+        return;
+    }
+
+    string filename = url_decode(it->second);
+    if (!is_safe_path(BASE_DIR, filename)) {
+        send_response(client_sock, 400, "Bad Request", "Invalid filename");
+        return;
+    }
+
+    string file_path = BASE_DIR + filename;
+    ofstream file(file_path, ios::binary);
+    if (!file) {
+        send_response(client_sock, 500, "Internal Server Error", "Failed to save file");
+        return;
+    }
+
+    file.write(body.data(), body.size());
+    send_response(client_sock, 200, "OK", "File uploaded successfully");
+}
+
+void handle_get_archive(int client_sock, const string& filename) {
+    string input_path = BASE_DIR + filename;
+    if (!file_exists(input_path)) {
+        send_response(client_sock, 404, "Not Found", "File not found");
+        return;
+    }
+
+    string temp_file = TEMP_DIR + "archive_" + to_string(time(nullptr)) + ".tar";
+    if (!create_tar_archive(input_path, temp_file)) {
+        send_response(client_sock, 500, "Internal Server Error", "Failed to create archive");
+        return;
+    }
+
+    send_file(client_sock, temp_file);
+    remove(temp_file.c_str());
+}
+
+void handle_post_extract(int client_sock, const map<string, string>& headers, const string& body) {
+    auto it = headers.find("x-filename");
+    if (it == headers.end()) {
+        send_response(client_sock, 400, "Bad Request", "Missing X-Filename header");
+        return;
+    }
+
+    string filename = url_decode(it->second);
+    if (!is_safe_path(BASE_DIR, filename)) {
+        send_response(client_sock, 400, "Bad Request", "Invalid filename");
+        return;
+    }
+
+    string file_path = BASE_DIR + filename;
+    ofstream file(file_path, ios::binary);
+    if (!file) {
+        send_response(client_sock, 500, "Internal Server Error", "Failed to save file");
+        return;
+    }
+    file.write(body.data(), body.size());
+    file.close();
+
+    string ext = filename.substr(filename.find_last_of('.') + 1);
+    if (ext != "tar" && ext != "gz") {
+        send_response(client_sock, 400, "Bad Request", "Unsupported archive format");
+        return;
+    }
+
+    // Проверка, является ли файл tar-архивом
+    pid_t pid = fork();
+    if (pid == -1) {
+        cerr << "fork failed for tar check: " << strerror(errno) << endl;
+        send_response(client_sock, 500, "Internal Server Error", "Failed to validate archive");
+        return;
+    }
+    if (pid == 0) {
+        execlp("tar", "tar", "-tf", file_path.c_str(), nullptr);
+        cerr << "execlp failed for tar check: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            cerr << "File " << file_path << " is not a valid tar archive" << endl;
+            send_response(client_sock, 400, "Bad Request", "Invalid tar archive");
+            return;
+        }
+    }
+
+    string output_dir = BASE_DIR + "extracted_" + filename;
+    if (!create_directory(output_dir)) {
+        send_response(client_sock, 500, "Internal Server Error", "Failed to create output directory");
+        return;
+    }
+
+    if (!extract_archive(file_path, output_dir)) {
+        send_response(client_sock, 500, "Internal Server Error", "Failed to extract archive");
+        return;
+    }
+
+    send_response(client_sock, 200, "OK", "Archive extracted successfully");
+}
+
+// Основной обработчик клиента
+void handle_client(int client_sock) {
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_read <= 0) {
+        close(client_sock);
+        return;
+    }
+
+    buffer[bytes_read] = '\0';
+    string request(buffer, bytes_read);
+
+    vector<string> lines;
+    istringstream iss(request);
+    string line;
+    while (getline(iss, line, '\n')) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
+    }
+
+    if (lines.empty()) {
+        send_response(client_sock, 400, "Bad Request", "Empty request");
+        close(client_sock);
+        return;
+    }
+
+    istringstream request_line(lines[0]);
+    string method, path, version;
+    request_line >> method >> path >> version;
+
+    auto headers = parse_headers(lines);
+
+    string body;
+    if (method == "POST") {
+        size_t body_start = request.find("\r\n\r\n");
+        if (body_start != string::npos) {
+            body_start += 4;
+            body = request.substr(body_start);
+        }
+    }
+
+    if (method == "GET" && path.find("/file") == 0) {
+        size_t pos = path.find("?name=");
+        if (pos == string::npos) {
+            send_response(client_sock, 400, "Bad Request", "Missing filename parameter");
+        } else {
+            string filename = url_decode(path.substr(pos + 6));
+            handle_get_file(client_sock, filename);
+        }
+    } 
+    else if (method == "POST" && path == "/upload") {
+        handle_post_upload(client_sock, headers, body);
+    } 
+    else if (method == "GET" && path.find("/archive") == 0) {
+        size_t pos = path.find("?name=");
+        if (pos == string::npos) {
+            send_response(client_sock, 400, "Bad Request", "Missing filename parameter");
+        } else {
+            string filename = url_decode(path.substr(pos + 6));
+            handle_get_archive(client_sock, filename);
+        }
+    } 
+    else if (method == "POST" && path == "/extract") {
+        handle_post_extract(client_sock, headers, body);
+    } 
+    else {
+        send_response(client_sock, 404, "Not Found", "Invalid endpoint");
+    }
+
+    close(client_sock);
+}
+
+int main() {
+    const string BASE_DIR = "files/";  // Без точки в начале
+    const string TEMP_DIR = "temp/";   // Без точки в начале
+
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        cerr << "Socket creation failed: " << strerror(errno) << endl;
+        return 1;
+    }
+
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    sockaddr_in address;
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    if (bind(server_fd, (sockaddr*)&address, sizeof(address)) < 0) {
+        cerr << "Bind failed: " << strerror(errno) << endl;
+        close(server_fd);
+        return 1;
+    }
+
+    if (listen(server_fd, MAX_CONNECTIONS) < 0) {
+        cerr << "Listen failed: " << strerror(errno) << endl;
+        close(server_fd);
+        return 1;
+    }
+
+    cout << "Server started on port " << PORT << endl;
+
+    while (true) {
+        sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        int client_sock = accept(server_fd, (sockaddr*)&client_addr, &client_len);
+        
+        if (client_sock < 0) {
+            cerr << "Accept failed: " << strerror(errno) << endl;
+            continue;
+        }
+
+        thread(handle_client, client_sock).detach();
+    }
+
+    close(server_fd);
+    return 0;
+}
